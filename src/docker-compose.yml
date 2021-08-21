@@ -1,19 +1,54 @@
-version: '2'
-
+version: '3.8'
 services:
-  openldap:
-    image: docker.io/bitnami/openldap:2.5
+      
+  mysql:
+    image: mysql:5.7.35
+    container_name: mysql
     ports:
-      - '1389:1389'
-      - '1636:1636'
+      - "3306:3306"
     environment:
-      - LDAP_ADMIN_USERNAME=admin
-      - LDAP_ADMIN_PASSWORD=adminpassword
-      - LDAP_USERS=user01,user02
-      - LDAP_PASSWORDS=password1,password2
-    volumes:
-      - 'openldap_data:/bitnami/openldap'
+      - MYSQL_DATABASE=keycloak
+      - MYSQL_USER=keycloak
+      - MYSQL_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=root_password
+    healthcheck:
+      test: "mysqladmin ping -u root -p$${MYSQL_ROOT_PASSWORD}"
+      start_period: 30s
 
-volumes:
-  openldap_data:
-    driver: local
+  keycloak:
+    image: jboss/keycloak:latest
+    container_name: keycloak
+    environment:
+      - KEYCLOAK_USER=admin
+      - KEYCLOAK_PASSWORD=admin
+      - DB_VENDOR=mysql
+      - DB_ADDR=mysql
+      - DB_USER=keycloak
+      - DB_PASSWORD=password
+      - JDBC_PARAMS=useSSL=false
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+    healthcheck:
+      test: "curl -f http://localhost:8080/auth || exit 1"
+      start_period: 30s
+     
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: openldap
+    environment:
+      - LDAP_ORGANISATION="MyCompany Inc."
+      - LDAP_DOMAIN=mycompany.com
+    ports:
+      - "389:389"
+
+  phpldapadmin:
+    image: osixia/phpldapadmin:0.9.0
+    container_name: phpldapadmin
+    environment:
+      - PHPLDAPADMIN_LDAP_HOSTS=openldap
+    ports:
+      - "6443:443"
+    depends_on:
+      - openldap
